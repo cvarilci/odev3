@@ -1,0 +1,309 @@
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df = pd.read_csv("insurance.csv")
+
+print(df.head())
+print(df.info())
+print(df.describe())
+print(df.isnull().sum())
+
+# Kategorik değişkenlerin hedef değişkenimiz (charges) üzerindeki etkisini görelim
+# Sigara içme durumuna göre masraflar
+sns.boxplot(x='smoker', y='charges', data=df)
+plt.title('Sigara İçme Durumuna Göre Tıbbi Masraflar')
+plt.show()
+
+# Cinsiyete göre masraflar
+sns.boxplot(x='sex', y='charges', data=df)
+plt.title('Cinsiyete Göre Tıbbi Masraflar')
+plt.show()
+
+# Bölgeye göre masraflar
+sns.boxplot(x='region', y='charges', data=df)
+plt.title('Bölgelere Göre Tıbbi Masraflar')
+plt.show()
+
+# Sayısal değişkenlerin ilişkisini inceleyelim
+# Yaş ve masraflar arasındaki ilişki
+sns.scatterplot(x='age', y='charges', hue='smoker', data=df)
+plt.title('Yaş ve Sigara Durumuna Göre Masraflar')
+plt.show()
+
+# BMI ve masraflar arasındaki ilişki
+sns.scatterplot(x='bmi', y='charges', hue='smoker', data=df)
+plt.title('BMI ve Sigara Durumuna Göre Masraflar')
+plt.show()
+
+
+# Sayısal sütunlar arasındaki korelasyonu hesaplayalım
+correlation_matrix = df.corr(numeric_only=True)
+
+# Isı haritasını çizelim
+plt.figure(figsize=(10, 8))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
+plt.title('Sayısal Değişkenler Arasındaki Korelasyon Matrisi')
+plt.show()
+
+print(correlation_matrix['charges'].sort_values(ascending=False))
+
+# 'charges' sütununun dağılımını inceleyelim
+sns.histplot(df['charges'], kde=True, bins=50)
+plt.title('Tıbbi Masrafların Dağılımı')
+plt.xlabel('Masraflar (Charges)')
+plt.ylabel('Frekans')
+plt.show()
+
+# Pairplot ile değişkenler arası ilişkilere ve sigara içme durumunun etkisine bakalım
+# Bu kod, veri setinin gücünü en iyi gösteren görselleştirmelerden biridir.
+sns.pairplot(df, hue='smoker', palette='viridis', corner=True)
+plt.show()
+
+# charges sütununun log dönüşümünü alalım ve dağılımını inceleyelim
+# Önce orijinal dağılımı ve logaritması alınmış dağılımı karşılaştırmak için
+# bir figür ve iki alt grafik oluşturalım.
+fig, axes = plt.subplots(1, 2, figsize=(15, 5))
+
+# Sol taraftaki grafik: Orijinal 'charges' dağılımı
+sns.histplot(df['charges'], kde=True, ax=axes[0], bins=50)
+axes[0].set_title('Dönüşüm Öncesi Orijinal Dağılım')
+
+# 'charges' sütununa log1p dönüşümü uygulayalım
+df['log_charges'] = np.log1p(df['charges'])
+
+# Sağ taraftaki grafik: Dönüştürülmüş 'log_charges' dağılımı
+sns.histplot(df['log_charges'], kde=True, ax=axes[1], bins=50)
+axes[1].set_title('Logaritmik Dönüşüm Sonrası Dağılım')
+
+plt.show()
+
+# data processing encoding one hot encoding ile kategorik değişkenleri sayısala çevirelim
+# Kategorik değişkenleri sayısala çevirelim
+df_processed = pd.get_dummies(df, columns=['sex', 'smoker', 'region'], drop_first=True)
+
+# drop_first=True, her kategoriden bir sütunu atarak gereksiz tekrarı önler.
+# Örneğin, sex_male sütunu 1 ise kadın olmadığını, 0 ise kadın olduğunu anlarız.
+
+print(df_processed.head())
+
+from sklearn.model_selection import train_test_split
+
+# df_processed, One-Hot Encoding sonrası DataFrame'iniz olsun.
+# Özellikler (X): 'charges' ve 'log_charges' dışındaki her şey.
+X = df_processed.drop(['charges', 'log_charges'], axis=1)
+
+# Hedef (y): Logaritmik dönüşüm uygulanmış 'log_charges' sütunu.
+y = df_processed['log_charges']
+
+# Veri setini %80 eğitim, %20 test olarak ayıralım.
+# random_state=42 kullanmak, kodu her çalıştırdığınızda aynı ayırma işleminin yapılmasını sağlar,
+# bu da sonuçların tekrarlanabilirliği için önemlidir.
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Ayırma işleminin doğru yapıldığını kontrol edelim.
+print("Eğitim seti özellikleri (X_train) boyutu:", X_train.shape)
+print("Test seti özellikleri (X_test) boyutu:", X_test.shape)
+print("Eğitim seti hedef (y_train) boyutu:", y_train.shape)
+print("Test seti hedef (y_test) boyutu:", y_test.shape)
+
+# Verilerin ölçeklendirilmesi
+from sklearn.preprocessing import StandardScaler
+
+# 1. Ölçekleyiciyi oluştur
+scaler = StandardScaler()
+
+# 2. Ölçekleyiciyi SADECE eğitim verisi üzerinde eğit ve EĞİTİM VERİSİNİ dönüştür
+X_train_scaled = scaler.fit_transform(X_train)
+
+# 3. Aynı (eğitilmiş) ölçekleyiciyi kullanarak TEST VERİSİNİ dönüştür
+X_test_scaled = scaler.transform(X_test)
+
+# Dönüşüm sonrası veri NumPy array'ine dönüşür. İsterseniz kontrol için DataFrame'e geri çevirebilirsiniz.
+# Bu adım zorunlu değildir, sadece görmek için.
+X_train_scaled_df = pd.DataFrame(X_train_scaled, columns=X_train.columns)
+print("Ölçeklendirilmiş Eğitim Verisi (İlk 5 Satır):")
+print(X_train_scaled_df.head())
+
+# lazy predict ile hızlıca modelleri deneyelim
+import lazypredict
+from lazypredict.Supervised import LazyRegressor
+
+#---------------------------------------------------------------------
+# BU KODLAR ZATEN YUKARIDA VARDI, AKIŞI GÖRMEK İÇİN TEKRAR EDİYORUZ
+# from sklearn.model_selection import train_test_split
+# from sklearn.preprocessing import StandardScaler
+#
+# X = df_processed.drop(['charges', 'log_charges'], axis=1)
+# y = df_processed['log_charges']
+# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+#
+# scaler = StandardScaler()
+# X_train_scaled = scaler.fit_transform(X_train)
+# X_test_scaled = scaler.transform(X_test)
+#---------------------------------------------------------------------
+
+
+# YENİ EKLENECEK KISIM BURASI
+
+print("\n--- LazyPredict ile Genel Model Performans Değerlendirmesi Başlatılıyor ---")
+
+# LazyRegressor'ü oluşturalım.
+# verbose=0, her model için detaylı logları kapatır, sadece sonuç tablosunu gösterir.
+# ignore_warnings=True, olası kütüphane uyarılarını temizler.
+reg = LazyRegressor(verbose=0, ignore_warnings=True, custom_metric=None)
+
+# Modeli ölçeklendirilmiş eğitim ve test verileriyle çalıştıralım
+# NOT: LazyPredict, logaritmik ölçekteki 'y' değerlerini kullanır.
+# Sonuçları kendi içinde yorumlar.
+models, predictions = reg.fit(X_train_scaled, X_test_scaled, y_train, y_test)
+
+# Sonuç tablosunu yazdıralım
+print(models)
+
+# Yukarıdaki sonuç tablosunda, farklı regresyon modellerinin performans metriklerini görebilirsiniz.
+# R² (R-squared): Modelin açıklayıcılık oranını gösterir.
+# RMSE (Root Mean Squared Error): Hata oranını gösterir, ne kadar düşükse o kadar iyidir.
+# Time Taken: Modelin eğitilme süresini gösterir.
+# Bu metrikler, hangi modelin veri setiniz için en uygun olduğunu belirlemenize yardımcı olur.  
+
+"""
+Sonuçlar için yorumlar:
+Bu bölümde, projemizin ana modelleme aşamasına geçmeden önce, veri setimizin yapısına en uygun regresyon modellerini belirlemek amacıyla bir ön keşif analizi gerçekleştirilmiştir.
+Bu analiz için, onlarca farklı regresyon modelini standart parametrelerle hızlıca deneyip karşılaştıran lazypredict kütüphanesi kullanılmıştır. 
+Amaç, hangi model ailelerinin veri setimiz için daha yüksek potansiyel taşıdığını saptamak ve detaylı analiz için seçilecek modelleri bilinçli bir şekilde belirlemektir.
+
+Bulgular ve Analiz
+
+lazypredict çalışması sonucunda elde edilen performans tablosu, modellerin R-Kare (R-Squared) ve Kök Ortalama Kare Hata (RMSE) metriklerine göre sıralanmıştır. 
+Tablodan elde edilen temel bulgular şunlardır:
+
+Doğrusal Olmayan Modellerin Üstünlüğü: Tablonun en üst sıralarında GradientBoostingRegressor (R²: 0.87), SVR (R²: 0.86) ve RandomForestRegressor (R²: 0.85) gibi doğrusal olmayan (non-linear) ilişkileri yakalayabilen modellerin yer aldığı görülmektedir. Bu durum, Keşifçi Veri Analizi (EDA) aşamasında tespit ettiğimiz, özellikle 'smoker' (sigara içme durumu) ve 'bmi' (vücut kitle indeksi) gibi değişkenler arasındaki karmaşık etkileşimlerin varlığını doğrulamaktadır.
+SVR'nin Güçlü Adaylığı: Ödev kapsamında detaylı incelenecek olan SVR, en iyi performans gösteren ikinci model olarak öne çıkmaktadır. 
+Bu, SVR'nin veri setimizdeki yapıları yakalamak için çok güçlü bir aday olduğunu göstermektedir.
+Karar Ağacı ve Ağaç Tabanlı Modeller: Tekil DecisionTreeRegressor (R²: 0.81) oldukça iyi bir performans sergilemiştir. 
+GradientBoosting, RandomForest gibi daha gelişmiş ağaç tabanlı topluluk modellerinin listenin en başında yer alması, veri setimizin kurallara 
+dayalı bölme mantığına (örneğin, "eğer sigara içiyorsa VE bmi > 30 ise...") çok uygun olduğunu kanıtlamaktadır. Bu nedenle, temel yapı taşı olan Karar Ağacı'nı incelemek son derece mantıklıdır.
+Lineer Modellerin Performans "Tabanı": LinearRegression, Ridge, LassoCV, Lars ve BayesianRidge gibi tüm lineer modellerin ~0.80 R-Kare skoru civarında kümelendiği görülmektedir. 
+Bu, logaritmik dönüşüm sayesinde lineer modellerin dahi oldukça başarılı bir "temel performans (baseline)" seviyesi yakaladığını göstermektedir. 
+Bu gruptan LinearRegression'ı temel model olarak seçip, Ridge ve Lasso gibi regülarizasyon tekniklerinin bu temel üzerine bir iyileştirme sağlayıp sağlamadığını incelemek değerli olacaktır.
+KNN Regresyon: KNeighborsRegressor da yine ~0.80 R-Kare skoru ile lineer modellerle benzer bir performans grubunda yer almıştır. 
+Bu, mesafe bazlı bir algoritmanın da bu problem için geçerli bir seçenek olduğunu göstermektedir.
+Sonuç ve Sonraki Adımlar (4. ve 5. Adıma Geçiş)
+
+lazypredict ile yapılan bu ön analiz, model seçimi stratejimizi belirlemede kritik bir rol oynamıştır. 
+Elde edilen bulgular ışığında, projenin sonraki adımlarında aşağıdaki modellerin detaylı olarak kodlanmasına, eğitilmesine ve karşılaştırılmasına karar verilmiştir:
+
+Lineer Regresyon Ailesi:
+LinearRegression: Problemin temel doğrusal çözümünü ve "baseline" performansını temsil etmesi için.
+Ridge, Lasso, ElasticNet: Regülarizasyonun model performansına etkisini ve özellik seçimine yardımcı olup olmadığını gözlemlemek için.
+Destek Vektör Regresyonu (SVR): lazypredict tablosunda en üst sıralarda yer alan, doğrusal olmayan ilişkileri yakalama potansiyeli en yüksek modellerden biri olduğu için.
+Karar Ağacı Regresyonu (Decision Tree Regressor): Yorumlanabilirliği yüksek, kurallara dayalı yapısıyla veri setimizdeki etkileşimleri 
+anlama potansiyeli ve ağaç tabanlı modellerin genel başarısını temsil etmesi için.
+K-En Yakın Komşu Regresyonu (KNeighborsRegressor): Farklı bir mantıkla çalışan (örnek bazlı öğrenme) ve 
+lineer modellerle benzer bir performans sergileyen bu modeli karşılaştırmaya dahil etmek, model çeşitliliğini artıracaktır.
+Bu modeller, hem performans potansiyelleri hem de temel çalışma mantıklarındaki farklılıklar göz önünde bulundurularak seçilmiştir.
+ 4. ve 5. adımlarda bu modeller tek tek kurulacak, eğitilecek ve performansları orijinal ölçekte (dolar cinsinden) MAE ve R-Kare metrikleri kullanılarak karşılaştırılacaktır.
+"""
+
+# Bu yorumlar, projenin ilerleyen adımlarında hangi modellerin neden seçildiğini ve ne tür analizlerin yapılacağını açıklar.
+# Ayrıca, bu analiz sürecinin veri bilimi projelerindeki önemini vurgular.
+# Bu yorumlar, projenin ilerleyen adımlarında hangi modellerin neden seçildiğini ve ne tür analizlerin yapılacağını açıklar.
+# Ayrıca, bu analiz sürecinin veri bilimi projelerindeki önemini vurgular.
+# Böylece, modelleme sürecine bilinçli ve veri odaklı bir başlangıç yapılmış olur.
+
+"""
+Adım 4.1: Lineer Model Ailesinin Kurulması ve Değerlendirilmesi
+Bu bölümde, projemizin temelini oluşturacak olan lineer modelleri analiz edeceğiz. 
+Tüm modeller, daha önce hazırlanan ölçeklendirilmiş eğitim verisi (X_train_scaled, y_train) üzerinde eğitilecek ve performansları, 
+logaritmik tahminlerin orijinal dolar birimine geri çevrilmesiyle test verisi üzerinde ölçülecektir.
+"""
+
+# Gerekli kütüphaneleri ve metrikleri import edelim
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+from sklearn.metrics import r2_score, mean_absolute_error,mean_squared_error
+import pandas as pd
+import numpy as np
+
+# Sonuçları saklamak için bir liste oluşturalım
+linear_models_results = []
+
+# ÖNEMLİ: Karşılaştırma için y_test'i orijinal ölçeğine şimdi çevirelim.
+# Bu değişkeni tüm modeller için kullanacağız.
+y_test_original = np.expm1(y_test)
+
+# --- 1. Basit Lineer Regresyon (Baseline Model) ---
+print("1. Lineer Regresyon Modeli Eğitiliyor...")
+lr = LinearRegression()
+lr.fit(X_train_scaled, y_train)
+
+# Tahminleri logaritmik ölçekte yap ve orijinal ölçeğe geri çevir
+y_pred_log_lr = lr.predict(X_test_scaled)
+y_pred_lr = np.expm1(y_pred_log_lr)
+
+# Metrikleri hesapla
+r2_lr = r2_score(y_test_original, y_pred_lr)
+mae_lr = mean_absolute_error(y_test_original, y_pred_lr)
+linear_models_results.append({'Model': 'Linear Regression', 'R2 Score': r2_lr, 'MAE': mae_lr})
+print(f"   - Tamamlandı. R2 Score: {r2_lr:.4f}, MAE: {mae_lr:.2f}\n")
+
+
+# --- 2. Ridge Regresyon (L2 Regularization) ---
+print("2. Ridge Regresyon Modeli Eğitiliyor...")
+ridge = Ridge(random_state=42)
+ridge.fit(X_train_scaled, y_train)
+
+# Tahminleri yap ve geri çevir
+y_pred_log_ridge = ridge.predict(X_test_scaled)
+y_pred_ridge = np.expm1(y_pred_log_ridge)
+
+# Metrikleri hesapla
+r2_ridge = r2_score(y_test_original, y_pred_ridge)
+mae_ridge = mean_absolute_error(y_test_original, y_pred_ridge)
+linear_models_results.append({'Model': 'Ridge Regression', 'R2 Score': r2_ridge, 'MAE': mae_ridge})
+print(f"   - Tamamlandı. R2 Score: {r2_ridge:.4f}, MAE: {mae_ridge:.2f}\n")
+
+
+# --- 3. Lasso Regresyon (L1 Regularization) ---
+print("3. Lasso Regresyon Modeli Eğitiliyor...")
+lasso = Lasso(random_state=42)
+lasso.fit(X_train_scaled, y_train)
+
+# Tahminleri yap ve geri çevir
+y_pred_log_lasso = lasso.predict(X_test_scaled)
+y_pred_lasso = np.expm1(y_pred_log_lasso)
+
+# Metrikleri hesapla
+r2_lasso = r2_score(y_test_original, y_pred_lasso)
+mae_lasso = mean_absolute_error(y_test_original, y_pred_lasso)
+linear_models_results.append({'Model': 'Lasso Regression', 'R2 Score': r2_lasso, 'MAE': mae_lasso})
+print(f"   - Tamamlandı. R2 Score: {r2_lasso:.4f}, MAE: {mae_lasso:.2f}\n")
+
+
+# --- 4. Elastic Net Regresyon (L1 & L2 Combination) ---
+print("4. Elastic Net Modeli Eğitiliyor...")
+elastic_net = ElasticNet(random_state=42)
+elastic_net.fit(X_train_scaled, y_train)
+
+# Tahminleri yap ve geri çevir
+y_pred_log_elastic = elastic_net.predict(X_test_scaled)
+y_pred_elastic = np.expm1(y_pred_log_elastic)
+
+# Metrikleri hesapla
+r2_elastic = r2_score(y_test_original, y_pred_elastic)
+mae_elastic = mean_absolute_error(y_test_original, y_pred_elastic)
+linear_models_results.append({'Model': 'Elastic Net', 'R2 Score': r2_elastic, 'MAE': mae_elastic})
+print(f"   - Tamamlandı. R2 Score: {r2_elastic:.4f}, MAE: {mae_elastic:.2f}\n")
+
+
+# --- Sonuçları Toplu Halde Gösterelim ---
+results_df = pd.DataFrame(linear_models_results)
+print("--- LİNEER MODEL AİLESİ PERFORMANS ÖZETİ ---")
+print(results_df)
+
+
+
+
+
+
