@@ -336,3 +336,366 @@ Bu durum, Lasso'nun otomatik özellik seçimi yaparak gürültüyü azaltmasın�
 Sonraki adımlarda incelenecek olan SVR ve Karar Ağacı gibi doğrusal olmayan modellerin bu temel performans seviyesini aşıp aşamayacağı test edilecektir."
 """
 
+# SVR ile devam edelim
+from sklearn.svm import SVR # Support Vector Regressor
+from sklearn.model_selection import GridSearchCV    
+import time
+
+if __name__ == '__main__':
+
+    # --- SVR Modeli ve Hiperparametre Optimizasyonu ---
+    print("4. SVR Modeli için Hiperparametre Optimizasyonu Başlatılıyor...")
+    start_time = time.time()
+
+    # 1. Optimize edilecek parametreler için bir 'ızgara' (grid) tanımlayalım
+    # Bu değerler, denenecek olan C ve gamma kombinasyonlarını içerir.
+    param_grid = {
+        'C': [0.1, 1, 10, 100],
+        'gamma': ['scale', 'auto', 0.1, 0.01],
+        'kernel': ['rbf'] # En iyi aday olduğu için sadece 'rbf' kernelini deniyoruz.
+    }
+
+    # 2. GridSearchCV nesnesini oluşturalım
+    #   - estimator: Optimize edilecek model (SVR)
+    #   - param_grid: Denenecek parametreler
+    #   - cv=5: 5-katlı çapraz doğrulama (daha güvenilir sonuçlar için)
+    #   - scoring: En iyi parametreyi seçerken kullanılacak metrik. 'neg_mean_squared_error' MSE'yi minimize etmeye çalışır.
+    #   - n_jobs=-1: Bilgisayarın tüm işlemci çekirdeklerini kullanarak aramayı hızlandırır.
+    #   - verbose=2: Arama sırasında ilerleme durumunu gösterir.
+    grid_search = GridSearchCV(
+        estimator=SVR(),
+        param_grid=param_grid,
+        cv=5,
+        scoring='neg_mean_squared_error',
+        n_jobs=-1,
+        verbose=2
+    )
+
+    # 3. Grid Search'ü ölçeklendirilmiş eğitim verisiyle başlatalım
+    # Bu adım, tüm kombinasyonları denediği için biraz zaman alabilir.
+    grid_search.fit(X_train_scaled, y_train)
+
+    end_time = time.time()
+    print(f"\nGrid Search {end_time - start_time:.2f} saniyede tamamlandı.")
+
+    # 4. En iyi parametreleri ve en iyi skoru yazdıralım
+    print("\nEn iyi parametreler bulundu:")
+    print(grid_search.best_params_)
+
+    # 5. En iyi modeli kullanarak tahmin yapalım
+    # GridSearchCV, en iyi parametrelerle modeli zaten yeniden eğitmiştir.
+    # Bu eğilmiş modele 'best_estimator_' ile erişebiliriz.
+    best_svr = grid_search.best_estimator_
+
+    # Tahminleri logaritmik ölçekte yap ve orijinal ölçeğe geri çevir
+    y_pred_log_svr = best_svr.predict(X_test_scaled)
+    y_pred_svr = np.expm1(y_pred_log_svr)
+
+    # 6. Metrikleri hesaplayalım
+    r2_svr = r2_score(y_test_original, y_pred_svr)
+    mae_svr = mean_absolute_error(y_test_original, y_pred_svr)
+    mse_svr = mean_squared_error(y_test_original, y_pred_svr)
+    rmse_svr = np.sqrt(mse_svr)
+
+
+    # Sonuçları saklamak için bir sözlük oluşturalım
+    svr_result = {
+        'Model': 'SVR (Tuned)',
+        'R2 Score': r2_svr,
+        'MAE': mae_svr,
+        'RMSE': rmse_svr,
+        'Best Params': [grid_search.best_params_] # Parametreleri de saklayalım
+    }
+
+    # SVR sonucunu gösterelim
+    print("\n--- Optimize Edilmiş SVR Modeli Performansı ---")
+    print(f"R2 Score: {r2_svr:.4f}")
+    print(f"MAE: {mae_svr:.2f}")
+    print(f"RMSE: {rmse_svr:.2f}")
+
+    # Bu sonucu, daha sonraki genel karşılaştırma için ana sonuç listemize ekleyebiliriz.
+    # Örneğin: all_models_results.append(svr_result)
+
+    # Şimdi sıra karar ağacı modelinde
+    from sklearn.tree import DecisionTreeRegressor
+    # --- Karar Ağacı Modeli ve Hiperparametre Optimizasyonu ---
+    print("5. Karar Ağacı Modeli için Hiperparametre Optimizasyonu Başlatılıyor...")
+    start_time = time.time()
+
+    # 1. Optimize edilecek parametreler için bir 'ızgara' (grid) tanımlayalım
+    param_grid = {
+        'criterion': ['squared_error', 'absolute_error'],
+        'max_depth': [3, 5, 7, 10, None], # None, derinlik sınırı olmadığını belirtir
+        'min_samples_split': [2, 5, 10],
+        'min_samples_leaf': [1, 2, 4]
+    }
+
+    # 2. GridSearchCV nesnesini oluşturalım
+    # Ayarlar SVR ile benzer, sadece estimator değişiyor.
+    grid_search_dtr = GridSearchCV(
+        estimator=DecisionTreeRegressor(random_state=42),
+        param_grid=param_grid,
+        cv=5,
+        scoring='neg_mean_squared_error',
+        n_jobs=-1,
+        verbose=2
+    )
+
+    # 3. Grid Search'ü ölçeklendirilmiş eğitim verisiyle başlatalım
+    # NOT: Karar Ağaçları ölçeklendirmeye ihtiyaç duymaz, ancak tutarlılık
+    # açısından ve tüm modelleri aynı veri üzerinde denemek için ölçeklendirilmiş
+    # veriyi kullanmaya devam ediyoruz. Performansı etkilemeyecektir.
+    grid_search_dtr.fit(X_train_scaled, y_train)
+
+    end_time = time.time()
+    print(f"\nGrid Search {end_time - start_time:.2f} saniyede tamamlandı.")
+
+    # 4. En iyi parametreleri ve en iyi skoru yazdıralım
+    print("\nEn iyi parametreler bulundu:")
+    print(grid_search_dtr.best_params_)
+
+    # 5. En iyi modeli kullanarak tahmin yapalım
+    best_dtr = grid_search_dtr.best_estimator_
+
+    # Tahminleri logaritmik ölçekte yap ve orijinal ölçeğe geri çevir
+    y_pred_log_dtr = best_dtr.predict(X_test_scaled)
+    y_pred_dtr = np.expm1(y_pred_log_dtr)
+
+    # 6. Metrikleri hesaplayalım
+    r2_dtr = r2_score(y_test_original, y_pred_dtr)
+    mae_dtr = mean_absolute_error(y_test_original, y_pred_dtr)
+    mse_dtr = mean_squared_error(y_test_original, y_pred_dtr)
+    rmse_dtr = np.sqrt(mse_dtr)
+
+    # Sonuçları saklamak için bir sözlük oluşturalım
+    dtr_result = {
+        'Model': 'Decision Tree (Tuned)',
+        'R2 Score': r2_dtr,
+        'MAE': mae_dtr,
+        'RMSE': rmse_dtr,
+        'Best Params': [grid_search_dtr.best_params_]
+    }
+
+    # Karar Ağacı sonucunu gösterelim
+    print("\n--- Optimize Edilmiş Karar Ağacı Modeli Performansı ---")
+    print(f"R2 Score: {r2_dtr:.4f}")
+    print(f"MAE: {mae_dtr:.2f}")
+    print(f"RMSE: {rmse_dtr:.2f}")
+
+    # Bu sonucu da ana sonuç listemize ekleyebiliriz.
+    # Örneğin: all_models_results.append(dtr_result)
+
+    # Son olarak KNN modelini de ekleyelim
+    from sklearn.neighbors import KNeighborsRegressor
+    # --- KNN Modeli ve Hiperparametre Optimizasyonu ---
+    print("6. KNN Regresyon Modeli için Hiperparametre Optimizasyonu Başlatılıyor...")
+    start_time = time.time()
+
+    # 1. Optimize edilecek parametreler için bir 'ızgara' (grid) tanımlayalım
+    param_grid = {
+        'n_neighbors': [3, 5, 7, 9, 11, 15],
+        'weights': ['uniform', 'distance'],
+        'p': [1, 2] # 1: Manhattan, 2: Euclidean
+    }
+
+    # 2. GridSearchCV nesnesini oluşturalım
+    grid_search_knn = GridSearchCV(
+        estimator=KNeighborsRegressor(),
+        param_grid=param_grid,
+        cv=5,
+        scoring='neg_mean_squared_error',
+        n_jobs=-1,
+        verbose=2
+    )
+
+    # 3. Grid Search'ü ölçeklendirilmiş eğitim verisiyle başlatalım
+    # KNN'in mesafeye dayalı doğası gereği ölçeklendirilmiş veri kullanmak ZORUNLUDUR.
+    grid_search_knn.fit(X_train_scaled, y_train)
+
+    end_time = time.time()
+    print(f"\nGrid Search {end_time - start_time:.2f} saniyede tamamlandı.")
+
+    # 4. En iyi parametreleri ve en iyi skoru yazdıralım
+    print("\nEn iyi parametreler bulundu:")
+    print(grid_search_knn.best_params_)
+
+    # 5. En iyi modeli kullanarak tahmin yapalım
+    best_knn = grid_search_knn.best_estimator_
+
+    # Tahminleri logaritmik ölçekte yap ve orijinal ölçeğe geri çevir
+    y_pred_log_knn = best_knn.predict(X_test_scaled)
+    y_pred_knn = np.expm1(y_pred_log_knn)
+
+    # 6. Metrikleri hesaplayalım
+    r2_knn = r2_score(y_test_original, y_pred_knn)
+    mae_knn = mean_absolute_error(y_test_original, y_pred_knn)
+    mse_knn = mean_squared_error(y_test_original, y_pred_knn)
+    rmse_knn = np.sqrt(mse_knn)
+
+    # Sonuçları saklamak için bir sözlük oluşturalım
+    knn_result = {
+        'Model': 'KNN Regressor (Tuned)',
+        'R2 Score': r2_knn,
+        'MAE': mae_knn,
+        'RMSE': rmse_knn,
+        'Best Params': [grid_search_knn.best_params_]
+    }
+
+    # KNN sonucunu gösterelim
+    print("\n--- Optimize Edilmiş KNN Regresyon Modeli Performansı ---")
+    print(f"R2 Score: {r2_knn:.4f}")
+    print(f"MAE: {mae_knn:.2f}")
+    print(f"RMSE: {rmse_knn:.2f}")
+
+    # Bu sonucu da ana sonuç listemize ekleyebiliriz.
+    # Örneğin: all_models_results.append(knn_result)
+
+# Tüm Modellerin Sonuçlarını Birleştirme ve Nihai Analiz
+
+################################################################################
+# ADIM 1: TÜM SONUÇLARI TUTACAK ANA LİSTEYİ OLUŞTUR
+################################################################################
+all_models_results = []
+
+# y_test'i orijinal ölçeğine çevirelim (Tüm modeller için ortak)
+y_test_original = np.expm1(y_test)
+
+################################################################################
+# BÖLÜM 4.1: Lineer Model Ailesi
+################################################################################
+print("--- Lineer Model Ailesi Çalıştırılıyor ---")
+# --- Lineer Regresyon ---
+lr = LinearRegression().fit(X_train_scaled, y_train)
+y_pred_lr = np.expm1(lr.predict(X_test_scaled))
+all_models_results.append({
+    'Model': 'Linear Regression',
+    'R2 Score': r2_score(y_test_original, y_pred_lr),
+    'MAE': mean_absolute_error(y_test_original, y_pred_lr),
+    'RMSE': np.sqrt(mean_squared_error(y_test_original, y_pred_lr))
+})
+
+# --- Ridge Regresyon ---
+ridge = Ridge(alpha=0.01, random_state=42).fit(X_train_scaled, y_train)
+y_pred_ridge = np.expm1(ridge.predict(X_test_scaled))
+all_models_results.append({
+    'Model': 'Ridge Regression',
+    'R2 Score': r2_score(y_test_original, y_pred_ridge),
+    'MAE': mean_absolute_error(y_test_original, y_pred_ridge),
+    'RMSE': np.sqrt(mean_squared_error(y_test_original, y_pred_ridge))
+})
+
+# --- Lasso Regresyon ---
+lasso = Lasso(alpha=0.01, random_state=42).fit(X_train_scaled, y_train)
+y_pred_lasso = np.expm1(lasso.predict(X_test_scaled))
+all_models_results.append({
+    'Model': 'Lasso Regression',
+    'R2 Score': r2_score(y_test_original, y_pred_lasso),
+    'MAE': mean_absolute_error(y_test_original, y_pred_lasso),
+    'RMSE': np.sqrt(mean_squared_error(y_test_original, y_pred_lasso))
+})
+print("Lineer modeller tamamlandı.\n")
+
+
+################################################################################
+# BÖLÜM 4.2: SVR (Hiperparametre Optimizasyonu ile)
+################################################################################
+print("--- SVR Modeli Çalıştırılıyor (Grid Search) ---")
+param_grid_svr = {'C': [1, 10, 100], 'gamma': ['scale', 0.1, 0.01], 'kernel': ['rbf']}
+grid_search_svr = GridSearchCV(SVR(), param_grid_svr, cv=5, scoring='neg_mean_squared_error', n_jobs=-1, verbose=0)
+grid_search_svr.fit(X_train_scaled, y_train)
+best_svr = grid_search_svr.best_estimator_
+y_pred_svr = np.expm1(best_svr.predict(X_test_scaled))
+all_models_results.append({
+    'Model': 'SVR (Tuned)',
+    'R2 Score': r2_score(y_test_original, y_pred_svr),
+    'MAE': mean_absolute_error(y_test_original, y_pred_svr),
+    'RMSE': np.sqrt(mean_squared_error(y_test_original, y_pred_svr))
+})
+print(f"SVR tamamlandı. En iyi parametreler: {grid_search_svr.best_params_}\n")
+
+
+################################################################################
+# BÖLÜM 4.3: Karar Ağacı (Hiperparametre Optimizasyonu ile)
+################################################################################
+print("--- Karar Ağacı Modeli Çalıştırılıyor (Grid Search) ---")
+param_grid_dtr = {'max_depth': [3, 5, 7, 10], 'min_samples_split': [2, 5, 10], 'min_samples_leaf': [1, 2, 4]}
+grid_search_dtr = GridSearchCV(DecisionTreeRegressor(random_state=42), param_grid_dtr, cv=5, scoring='neg_mean_squared_error', n_jobs=-1, verbose=0)
+grid_search_dtr.fit(X_train_scaled, y_train)
+best_dtr = grid_search_dtr.best_estimator_
+y_pred_dtr = np.expm1(best_dtr.predict(X_test_scaled))
+all_models_results.append({
+    'Model': 'Decision Tree (Tuned)',
+    'R2 Score': r2_score(y_test_original, y_pred_dtr),
+    'MAE': mean_absolute_error(y_test_original, y_pred_dtr),
+    'RMSE': np.sqrt(mean_squared_error(y_test_original, y_pred_dtr))
+})
+print(f"Karar Ağacı tamamlandı. En iyi parametreler: {grid_search_dtr.best_params_}\n")
+
+
+################################################################################
+# BÖLÜM 4.4: KNN Regresyon (Hiperparametre Optimizasyonu ile)
+################################################################################
+print("--- KNN Regresyon Modeli Çalıştırılıyor (Grid Search) ---")
+param_grid_knn = {'n_neighbors': [3, 5, 7, 9, 11], 'weights': ['uniform', 'distance'], 'p': [1, 2]}
+grid_search_knn = GridSearchCV(KNeighborsRegressor(), param_grid_knn, cv=5, scoring='neg_mean_squared_error', n_jobs=-1, verbose=0)
+grid_search_knn.fit(X_train_scaled, y_train)
+best_knn = grid_search_knn.best_estimator_
+y_pred_knn = np.expm1(best_knn.predict(X_test_scaled))
+all_models_results.append({
+    'Model': 'KNN Regressor (Tuned)',
+    'R2 Score': r2_score(y_test_original, y_pred_knn),
+    'MAE': mean_absolute_error(y_test_original, y_pred_knn),
+    'RMSE': np.sqrt(mean_squared_error(y_test_original, y_pred_knn))
+})
+print(f"KNN tamamlandı. En iyi parametreler: {grid_search_knn.best_params_}\n")
+
+
+################################################################################
+# ADIM 3: NİHAİ SONUÇ TABLOSUNU OLUŞTUR
+################################################################################
+final_results_df = pd.DataFrame(all_models_results)
+
+# En iyi modeli en üste getirmek için sonuçları RMSE'ye göre sıralayalım
+final_results_df_sorted = final_results_df.sort_values(by='RMSE')
+
+print("--- TÜM MODELLERİN NİHAİ PERFORMANS KARŞILAŞTIRMASI ---")
+print(final_results_df_sorted)
+
+"""
+Nihai Model Performans Analizi
+Proje kapsamında geliştirilen ve optimize edilen regresyon modellerinin karşılaştırmalı performans sonuçları yukarıdaki tabloda özetlenmiştir. 
+Modeller, en düşük hata oranını (RMSE) gösterenden en yükseğe doğru sıralanmıştır. Tabloyu analiz ettiğimizde şu önemli sonuçlara ulaşmaktayız:
+
+1. En Başarılı Modeller: Karar Ağacı ve SVR
+
+Zirvedeki Yakın Rekabet: En yüksek performansı, birbirine çok yakın sonuçlarla Optimize Edilmiş Karar Ağacı ve Optimize Edilmiş SVR modelleri sergilemiştir. 
+Her iki model de R-Kare (R²) skorunda %87'lik etkileyici bir başarıya ulaşarak veri setindeki değişkenliğin çok büyük bir kısmını açıklamayı başarmıştır.
+Hata Oranlarının Karşılaştırması:
+Karar Ağacı, 4452$ RMSE ile en düşük kök ortalama kare hataya sahiptir. Bu, modelin büyük hataları cezalandırma eğilimini yansıtan metrikte en başarılı olduğunu gösterir.
+SVR ise 2086$ MAE (Ortalama Mutlak Hata) ile bu metrikte en başarılı modeldir. Bu da SVR'nin tahminlerinin ortalama olarak gerçek değerden en az sapan model olduğunu gösterir.
+Yorum: Bu iki model arasındaki küçük farklar, hangi hata türüne daha fazla önem verildiğine göre değişebilir. 
+Ancak genel olarak, her ikisinin de bu problem için en uygun modeller olduğu açıktır. lazypredict ile yaptığımız ön analizde bu iki model ailesinin potansiyeli öngörülmüştü 
+ve detaylı analiz bu öngörüyü doğrulamıştır.
+
+2. KNN Regresyon'un Orta Seviye Başarısı
+
+Net Bir Ayrım: Optimize edilmiş KNN Regresyonu, %80 R-Kare skoru ve ~5567$ RMSE ile iyi bir performans göstermiş, ancak zirvedeki iki modelin belirgin şekilde gerisinde kalmıştır.
+Yorum: KNN'nin bu "orta segment" performansı, mesafe bazlı basit mantığının, SVR ve Karar Ağacı'nın karmaşık ilişkileri modelleme yeteneği kadar güçlü olmadığını göstermektedir. 
+Yine de lineer modellerden daha başarılıdır.
+
+3. Lineer Modellerin Sınırları
+
+Temel Performans Seviyesi: Lineer Regresyon, Ridge ve Lasso modelleri, %61-63 R-Kare ve ~7600-7800$ RMSE aralığında, birbirine çok yakın sonuçlarla tablonun en alt sıralarında yer almıştır.
+Yorum: Bu sonuçlar, lineer modellerin bu problem için yetersiz kaldığını açıkça ortaya koymaktadır.
+Daha önce EDA aşamasında tespit ettiğimiz, değişkenler arasındaki doğrusal olmayan ve karmaşık etkileşimler (örneğin sigara içme durumunun BMI etkisini katlaması gibi), 
+bu modellerin varsayımlarıyla çelişmektedir. Bu nedenle, ne kadar optimize edilirse edilsinler, performanslarının belirli bir tavanı aşamaması beklenen bir sonuçtur. 
+Lasso Regresyon'un bu aile içinde en iyi olması, özellik seçimi yaparak gürültüyü bir miktar azaltmasının bir sonucudur.
+Projenin Genel Sonucu ve Nihai Karar
+Bu proje, tıbbi masrafların tahmini gibi karmaşık bir problemde, doğru makine öğrenmesi modelini seçmenin ve optimize etmenin ne kadar kritik olduğunu göstermiştir.
+
+Nihai Karar: Eğer bu model bir şirkette kullanılacak olsaydı, Optimize Edilmiş Karar Ağacı veya Optimize Edilmiş SVR modellerinden biri tercih edilirdi. 
+Karar Ağacı'nın sonuçlarının (örneğin, "Eğer sigara içiyorsa VE yaşı 45'ten büyükse...") insanlar tarafından daha kolay yorumlanabilir olması, 
+iş birimlerine açıklama yapma kolaylığı açısından ona küçük bir avantaj sağlayabilir.
+Ancak, SVR'nin MAE'deki üstün performansı, özellikle ortalama hatanın minimize edilmesinin kritik olduğu durumlarda onu cazip kılar.
+Sonuç olarak, bu proje, veri bilimi projelerinde model seçimi ve hiperparametre optimizasyonunun önemini vurgulayan kapsamlı bir vaka çalışması olmuştur. 
+Elde edilen sonuçlar, gelecekte benzer problemlerle karşılaşıldığında yol gösterici olacaktır"""
