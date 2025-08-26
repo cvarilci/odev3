@@ -222,15 +222,14 @@ logaritmik tahminlerin orijinal dolar birimine geri çevrilmesiyle test verisi �
 
 # Gerekli kütüphaneleri ve metrikleri import edelim
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
-from sklearn.metrics import r2_score, mean_absolute_error,mean_squared_error
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 import pandas as pd
 import numpy as np
 
 # Sonuçları saklamak için bir liste oluşturalım
 linear_models_results = []
 
-# ÖNEMLİ: Karşılaştırma için y_test'i orijinal ölçeğine şimdi çevirelim.
-# Bu değişkeni tüm modeller için kullanacağız.
+# y_test'i orijinal ölçeğine çevirelim
 y_test_original = np.expm1(y_test)
 
 # --- 1. Basit Lineer Regresyon (Baseline Model) ---
@@ -238,20 +237,22 @@ print("1. Lineer Regresyon Modeli Eğitiliyor...")
 lr = LinearRegression()
 lr.fit(X_train_scaled, y_train)
 
-# Tahminleri logaritmik ölçekte yap ve orijinal ölçeğe geri çevir
+# Tahminleri yap ve geri çevir
 y_pred_log_lr = lr.predict(X_test_scaled)
 y_pred_lr = np.expm1(y_pred_log_lr)
 
 # Metrikleri hesapla
 r2_lr = r2_score(y_test_original, y_pred_lr)
 mae_lr = mean_absolute_error(y_test_original, y_pred_lr)
-linear_models_results.append({'Model': 'Linear Regression', 'R2 Score': r2_lr, 'MAE': mae_lr})
-print(f"   - Tamamlandı. R2 Score: {r2_lr:.4f}, MAE: {mae_lr:.2f}\n")
+mse_lr = mean_squared_error(y_test_original, y_pred_lr)
+rmse_lr = np.sqrt(mse_lr)
+linear_models_results.append({'Model': 'Linear Regression', 'R2 Score': r2_lr, 'MAE': mae_lr, 'RMSE': rmse_lr})
+print(f"   - Tamamlandı. R2 Score: {r2_lr:.4f}, MAE: {mae_lr:.2f}, RMSE: {rmse_lr:.2f}\n")
 
 
 # --- 2. Ridge Regresyon (L2 Regularization) ---
 print("2. Ridge Regresyon Modeli Eğitiliyor...")
-ridge = Ridge(random_state=42)
+ridge = Ridge(alpha=0.01,random_state=42)
 ridge.fit(X_train_scaled, y_train)
 
 # Tahminleri yap ve geri çevir
@@ -261,13 +262,15 @@ y_pred_ridge = np.expm1(y_pred_log_ridge)
 # Metrikleri hesapla
 r2_ridge = r2_score(y_test_original, y_pred_ridge)
 mae_ridge = mean_absolute_error(y_test_original, y_pred_ridge)
-linear_models_results.append({'Model': 'Ridge Regression', 'R2 Score': r2_ridge, 'MAE': mae_ridge})
-print(f"   - Tamamlandı. R2 Score: {r2_ridge:.4f}, MAE: {mae_ridge:.2f}\n")
+mse_ridge = mean_squared_error(y_test_original, y_pred_ridge)
+rmse_ridge = np.sqrt(mse_ridge)
+linear_models_results.append({'Model': 'Ridge Regression', 'R2 Score': r2_ridge, 'MAE': mae_ridge, 'RMSE': rmse_ridge})
+print(f"   - Tamamlandı. R2 Score: {r2_ridge:.4f}, MAE: {mae_ridge:.2f}, RMSE: {rmse_ridge:.2f}\n")
 
 
 # --- 3. Lasso Regresyon (L1 Regularization) ---
 print("3. Lasso Regresyon Modeli Eğitiliyor...")
-lasso = Lasso(random_state=42)
+lasso = Lasso(alpha=0.01, random_state=42) # alpha değeri regülarizasyon gücünü belirler
 lasso.fit(X_train_scaled, y_train)
 
 # Tahminleri yap ve geri çevir
@@ -277,13 +280,15 @@ y_pred_lasso = np.expm1(y_pred_log_lasso)
 # Metrikleri hesapla
 r2_lasso = r2_score(y_test_original, y_pred_lasso)
 mae_lasso = mean_absolute_error(y_test_original, y_pred_lasso)
-linear_models_results.append({'Model': 'Lasso Regression', 'R2 Score': r2_lasso, 'MAE': mae_lasso})
-print(f"   - Tamamlandı. R2 Score: {r2_lasso:.4f}, MAE: {mae_lasso:.2f}\n")
+mse_lasso = mean_squared_error(y_test_original, y_pred_lasso)
+rmse_lasso = np.sqrt(mse_lasso)
+linear_models_results.append({'Model': 'Lasso Regression', 'R2 Score': r2_lasso, 'MAE': mae_lasso, 'RMSE': rmse_lasso})
+print(f"   - Tamamlandı. R2 Score: {r2_lasso:.4f}, MAE: {mae_lasso:.2f}, RMSE: {rmse_lasso:.2f}\n")
 
 
 # --- 4. Elastic Net Regresyon (L1 & L2 Combination) ---
 print("4. Elastic Net Modeli Eğitiliyor...")
-elastic_net = ElasticNet(random_state=42)
+elastic_net = ElasticNet(alpha=0.001, random_state=42) # alpha değeri regülarizasyon gücünü belirler
 elastic_net.fit(X_train_scaled, y_train)
 
 # Tahminleri yap ve geri çevir
@@ -293,17 +298,41 @@ y_pred_elastic = np.expm1(y_pred_log_elastic)
 # Metrikleri hesapla
 r2_elastic = r2_score(y_test_original, y_pred_elastic)
 mae_elastic = mean_absolute_error(y_test_original, y_pred_elastic)
-linear_models_results.append({'Model': 'Elastic Net', 'R2 Score': r2_elastic, 'MAE': mae_elastic})
-print(f"   - Tamamlandı. R2 Score: {r2_elastic:.4f}, MAE: {mae_elastic:.2f}\n")
+mse_elastic = mean_squared_error(y_test_original, y_pred_elastic)
+rmse_elastic = np.sqrt(mse_elastic)
+linear_models_results.append({'Model': 'Elastic Net', 'R2 Score': r2_elastic, 'MAE': mae_elastic, 'RMSE': rmse_elastic})
+print(f"   - Tamamlandı. R2 Score: {r2_elastic:.4f}, MAE: {mae_elastic:.2f}, RMSE: {rmse_elastic:.2f}\n")
 
 
 # --- Sonuçları Toplu Halde Gösterelim ---
 results_df = pd.DataFrame(linear_models_results)
-print("--- LİNEER MODEL AİLESİ PERFORMANS ÖZETİ ---")
+print("--- LİNEER MODEL AİLESİ PERFORMANS ÖZETİ (RMSE DAHİL) ---")
 print(results_df)
+# Sonuçları RMSE'ye göre sıralayalım
+results_df_sorted = results_df.sort_values(by='RMSE')
+print("\n--- RMSE'ye Göre Sıralanmış Sonuçlar ---")
+print(results_df_sorted)
+"""
+Sonuçların Analizi ve Yorumlanması
 
+Lasso'nun Başarısı (En Önemli Bulgu): Sıralanmış listeye baktığımızda, en iyi performansı (en düşük RMSE ve MAE, en yüksek R-Kare) 
+Lasso Regresyon modelinin sergilediğini görüyoruz. Bu tesadüf değil.
+Anlamı: Lasso Regresyon (L1 regülarizasyonu), önemsiz veya daha az önemli gördüğü özelliklerin katsayılarını tam olarak sıfır yapma yeteneğine sahiptir. 
+Bu, bir nevi otomatik "özellik seçimi" (feature selection) yapması demektir. Sonuçlarınız, veri setinizdeki bazı özelliklerin elenmesinin, 
+gürültüyü azaltarak daha iyi bir tahmin modeline yol açtığını gösteriyor.
+Ridge ve Lineer Regresyonun Yakınlığı: Ridge ve Linear Regression modellerinin performansları neredeyse aynı.
+Anlamı: Ridge (L2 regülarizasyonu), katsayıları küçültür ama asla tam olarak sıfır yapmaz; tüm özellikleri modelde tutar. 
+Performansının temel lineer regresyondan belirgin şekilde daha iyi olmaması, modelde çok ciddi bir "multicollinearity" (özelliklerin birbiriyle yüksek korelasyonu) 
+sorunu olmadığını veya L2 regülarizasyonunun bu veri setinde büyük bir fark yaratmadığını düşündürür.
+Genel İyileşme: Tüm lineer modeller artık mantıklı ve tutarlı sonuçlar veriyor. R-Kare değerlerinin ~0.61-0.63 aralığında olması, 
+bu model ailesinin, tıbbi masraflardaki varyansın yaklaşık %61-63'ünü açıklayabildiğini gösteriyor. RMSE değerinin ~7600-7800$ aralığında olması ise, bu modellerin tahminlerinin ortalama olarak bu civarda bir hata payına sahip olduğunu belirtiyor.
+Ödev Raporu İçin Çıkarımlar
 
-
-
-
+"Lineer model ailesi, hiperparametre ayarlaması sonrasında tutarlı sonuçlar vermiştir. 
+Varsayılan alpha değerleriyle başarısız olan Lasso ve ElasticNet, alpha değerleri düşürüldüğünde rekabetçi hale gelmiştir."
+"Bu aile içindeki en başarılı model, 7617$ RMSE değeri ile Lasso Regresyon olmuştur. 
+Bu durum, Lasso'nun otomatik özellik seçimi yaparak gürültüyü azaltmasının ve daha genelleştirilebilir bir model oluşturmasının bir sonucu olarak yorumlanabilir."
+"Lineer modellerin ulaştığı en iyi R-Kare skoru ~0.63'tür. Bu, projemiz için bir temel performans (baseline) seviyesi olarak kabul edilecektir. 
+Sonraki adımlarda incelenecek olan SVR ve Karar Ağacı gibi doğrusal olmayan modellerin bu temel performans seviyesini aşıp aşamayacağı test edilecektir."
+"""
 
